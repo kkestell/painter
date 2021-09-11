@@ -43,23 +43,23 @@ namespace Painter
         // Indexers
         // Methods
 
-        public static Triangle Perturb(Triangle triangle, int radius)
+        public static Triangle Perturb(Triangle triangle, int radius, int width, int height)
         {
             var v1 = Vector2.Perturb(triangle.V1, radius);
             var v2 = Vector2.Perturb(triangle.V2, radius);
             var v3 = Vector2.Perturb(triangle.V3, radius);
 
-            v1.Clamp();
-            v2.Clamp();
-            v3.Clamp();
+            v1.Clamp(width, height);
+            v2.Clamp(width, height);
+            v3.Clamp(width, height);
 
             return new Triangle(v1, v2, v3);
         }
 
-        public static Triangle Random(int size)
+        public static Triangle Random(int size, int width, int height)
         {
             var rng = new Random();
-            var position = Vector2.Random();
+            var position = Vector2.Random(width, height);
 
             var v1 = new Vector2(
                 position.X + rng.Next(-size, size),
@@ -71,9 +71,9 @@ namespace Painter
                 position.X + rng.Next(-size, size),
                 position.Y + rng.Next(-size, size));
 
-            v1.Clamp();
-            v2.Clamp();
-            v3.Clamp();
+            v1.Clamp(width, height);
+            v2.Clamp(width, height);
+            v3.Clamp(width, height);
 
             return new Triangle(v1, v2, v3);
         }
@@ -98,7 +98,7 @@ namespace Painter
 
         public override string ToString()
         {
-            return $"{V1.X},{V1.Y}, {V2.X},{V2.Y}, {V2.X},{V2.Y}";
+            return $"{V1.X},{V1.Y}, {V2.X},{V2.Y}, {V3.X},{V3.Y}";
         }
 
         // Structs

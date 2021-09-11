@@ -1,5 +1,5 @@
-﻿using System;
-using SixLabors.Primitives;
+﻿using SixLabors.ImageSharp;
+using System;
 
 namespace Painter
 {
@@ -46,13 +46,13 @@ namespace Painter
                 v.Y + ((float)Math.Sin(angle) * radius));
         }
 
-        public static Vector2 Random()
+        public static Vector2 Random(int imageWidth, int imageHeight)
         {
             var rng = new Random();
 
             return new Vector2(
-                rng.Next(0, Image.Size),
-                rng.Next(0, Image.Size));
+                rng.Next(0, imageWidth),
+                rng.Next(0, imageHeight));
         }
 
         public static implicit operator PointF(Vector2 v)
@@ -60,16 +60,16 @@ namespace Painter
             return new PointF(v.X, v.Y);
         }
 
-        public void Clamp()
+        public void Clamp(int imageWidth, int imageHeight)
         {
-            if (X > Image.Size)
-                X = Image.Size;
+            if (X > imageWidth)
+                X = imageWidth;
 
             if (X < 0)
                 X = 0;
 
-            if (Y > Image.Size)
-                Y = Image.Size;
+            if (Y > imageHeight)
+                Y = imageHeight;
 
             if (Y < 0)
                 Y = 0;
