@@ -1,16 +1,15 @@
-﻿using System;
-using SixLabors.ImageSharp;
+﻿using SixLabors.ImageSharp;
+using SixLabors.ImageSharp.Drawing.Processing;
 using SixLabors.ImageSharp.PixelFormats;
 using SixLabors.ImageSharp.Processing;
-using SixLabors.Primitives;
+using System;
 
 namespace Painter
 {
     internal class Image
     {
         // Constant Fields
-
-        public const int Size = 256;
+        const int ResizeHeight = 256;
 
         // Fields
 
@@ -20,13 +19,17 @@ namespace Painter
 
         public Image(string filename)
         {
-            image = SixLabors.ImageSharp.Image.Load(filename);
-            image.Mutate(i => i.Resize(Size, Size));
+            image = (Image<Rgba32>)SixLabors.ImageSharp.Image.Load(filename);
+
+            var ratio = ResizeHeight / image.Height;
+            var newWidth = image.Width * ratio;
+
+            image.Mutate(i => i.Resize(newWidth, ResizeHeight));
         }
 
-        public Image()
+        public Image(int inputWidth, int inputHeight)
         {
-            image = new Image<Rgba32>(Size, Size);
+            image = new Image<Rgba32>(inputWidth, inputHeight);
         }
 
         public Image(Image<Rgba32> image)
@@ -40,8 +43,6 @@ namespace Painter
         // Enums
         // Interfaces
         // Properties
-
-        public Rgba32 this[int x, int y] => image[x, y];
 
         public int Width => image.Width;
 
@@ -57,15 +58,20 @@ namespace Painter
             long sum = 0;
             long n = 0;
 
-            for (var y = 0; y < image1.Height; y++)
-            for (var x = 0; x < image1.Width; x++)
+            for (int y = 0; y < image1.Height; y++)
             {
-                var d =
-                    (long) Math.Pow(image1[x, y].R - image2[x, y].R, 2) +
-                    (long) Math.Pow(image1[x, y].G - image2[x, y].G, 2) +
-                    (long) Math.Pow(image1[x, y].B - image2[x, y].B, 2);
-                sum += d;
-                n++;
+                Span<Rgba32> image1PixelRowSpan = image1.image.GetPixelRowSpan(y);
+                Span<Rgba32> image2PixelRowSpan = image2.image.GetPixelRowSpan(y);
+
+                for (int x = 0; x < image1.Width; x++)
+                {
+                    var d =
+                        (long)Math.Pow(image1PixelRowSpan[x].R - image2PixelRowSpan[x].R, 2) +
+                        (long)Math.Pow(image1PixelRowSpan[x].G - image2PixelRowSpan[x].G, 2) +
+                        (long)Math.Pow(image1PixelRowSpan[x].B - image2PixelRowSpan[x].B, 2);
+                    sum += d;
+                    n++;
+                }
             }
 
             return Math.Sqrt(sum / n);
@@ -87,13 +93,17 @@ namespace Painter
         {
             long r = 0, g = 0, b = 0;
 
-            for (var y = 0; y < image.Height; y++)
-            for (var x = 0; x < image.Width; x++)
+            for (int y = 0; y < image.Height; y++)
             {
-                var color = image[x, y];
-                r += color.R;
-                g += color.G;
-                b += color.B;
+                Span<Rgba32> imagePixelRowSpan = image.GetPixelRowSpan(y);
+
+                for (int x = 0; x < image.Width; x++)
+                {
+                    var color = imagePixelRowSpan[x];
+                    r += color.R;
+                    g += color.G;
+                    b += color.B;
+                }
             }
 
             var cnt = image.Width * image.Height;
@@ -107,18 +117,24 @@ namespace Painter
         {
             long r = 0, g = 0, b = 0, cnt = 0;
 
-            for (var y = 0; y < image.Height; y++)
-            for (var x = 0; x < image.Width; x++)
-                if (region.Contains(new Vector2(x, y)))
-                {
-                    var color = image[x, y];
-                    r += color.R;
-                    g += color.G;
-                    b += color.B;
-                    cnt++;
-                }
+            for (int y = 0; y < image.Height; y++)
+            {
+                Span<Rgba32> imagePixelRowSpan = image.GetPixelRowSpan(y);
 
-            if (cnt == 0) return Rgba32.Black;
+                for (int x = 0; x < image.Width; x++)
+                {
+                    if (region.Contains(new Vector2(x, y)))
+                    {
+                        var color = imagePixelRowSpan[x];
+                        r += color.R;
+                        g += color.G;
+                        b += color.B;
+                        cnt++;
+                    }
+                }
+            }
+
+            if (cnt == 0) return Color.Black;
 
             return new Rgba32(
                 (byte) (r / cnt),
@@ -131,11 +147,12 @@ namespace Painter
             image.Save(filename);
         }
 
-        public void DrawTriangle(Triangle triangle, Rgba32 color)
+        public void DrawTriangle(Triangle triangle, Color color)
         {
             image.Mutate(
                 i => i.FillPolygon(
-                    color, triangle.V1, triangle.V2, triangle.V3));
+                    color,
+                    triangle.V1, triangle.V2, triangle.V3));
         }
 
         public Image Clone()

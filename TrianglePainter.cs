@@ -23,14 +23,17 @@ namespace Painter
         {
             if (!(stateObject is State state)) return;
 
-            var bestTriangle = Triangle.Random(64);
+            var width = ((State)stateObject).ImageWidth;
+            var height = ((State)stateObject).ImageHeight;
+
+            var bestTriangle = Triangle.Random(64, width, height);
             var bestScore = double.MaxValue;
 
             for (var t = 0; t < 128; t++)
             {
                 // FIXME
                 var size = (128 - t) / 2 + 64;
-                var newTriangle = Triangle.Random(size);
+                var newTriangle = Triangle.Random(size, width, height);
 
                 var newImage = state.CanvasImage.Clone();
 
@@ -66,7 +69,10 @@ namespace Painter
             {
                 var newImage = state.CanvasImage.Clone();
 
-                var perturbedTriangle = Triangle.Perturb(bestTriangle, 1);
+                var width = ((State)stateObject).ImageWidth;
+                var height = ((State)stateObject).ImageHeight;
+
+                var perturbedTriangle = Triangle.Perturb(bestTriangle, 1, width, height);
 
                 newImage.DrawTriangle(
                     perturbedTriangle,
@@ -88,16 +94,19 @@ namespace Painter
             state.EventWaitHandle.Set();
         }
 
-        public void Run(string filename)
+        public void Run(Arguments args)
         {
-            var sourceImage = new Image(filename);
+            var sourceImage = new Image(args.InputFilePath);
 
-            var canvasImage = new Image();
+            var canvasImage = new Image(sourceImage.Width, sourceImage.Height);
             canvasImage.Fill(sourceImage.AverageColor());
+
+            var svg = new SVG(sourceImage.Width, sourceImage.Height);
+            svg.Fill(sourceImage.AverageColor());
 
             var bestScore = double.MaxValue;
 
-            for (var t1 = 0; t1 < 256; t1++)
+            for (var t1 = 0; t1 < args.IterationCount; t1++)
             {
                 // Find a triangle
 
@@ -108,7 +117,9 @@ namespace Painter
                     var state = new State
                     {
                         SourceImage = sourceImage,
-                        CanvasImage = canvasImage
+                        CanvasImage = canvasImage,
+                        ImageWidth = sourceImage.Width,
+                        ImageHeight = sourceImage.Height
                     };
 
                     ThreadPool.QueueUserWorkItem(FindTriangle, state);
@@ -131,7 +142,9 @@ namespace Painter
                     {
                         SourceImage = sourceImage,
                         CanvasImage = canvasImage,
-                        InitialState = bestTriangleMatch.BestTriangle
+                        InitialState = bestTriangleMatch.BestTriangle,
+                        ImageWidth = sourceImage.Width,
+                        ImageHeight = sourceImage.Height
                     };
 
                     ThreadPool.QueueUserWorkItem(PerformPerturbation, state);
@@ -155,13 +168,42 @@ namespace Painter
                         sourceImage.AverageColor(
                             bestPertubationMatch.BestTriangle));
 
+                    svg.DrawTriangle(
+                        bestPertubationMatch.BestTriangle,
+                        sourceImage.AverageColor(
+                            bestPertubationMatch.BestTriangle));
+
                     Console.WriteLine($"{t1:D4} {bestScore}");
                 }
 
-                canvasImage.Save($"output{t1:D4}.png");
+                if (args.SaveIntermediateImages)
+                    TrySaveImages(canvasImage, svg, $"output{t1:D4}");
             }
 
-            canvasImage.Save("output.png");
+            TrySaveImages(canvasImage, svg, args.OutputFilePath);
+        }
+
+        // File I/O occasionally leads to transient failures here, so we retry
+        // a reasonable number of times then bomb out if unsuccessful.
+        private void TrySaveImages(Image canvasImage, SVG svg, string fileName)
+        {
+            var retryCount = 0;
+            while (retryCount < 10)
+            {
+                try
+                {
+                    canvasImage.Save($"{fileName}.png");
+                    svg.Save($"{fileName}.svg");
+                    return;
+                }
+                catch (Exception e)
+                {
+                    Console.WriteLine($"Exception occurred while saving file: {e}");
+                }
+            }
+
+            Console.WriteLine("Unable to save file after 10 retries. Aborting.");
+            Environment.Exit(1);
         }
 
         // Structs

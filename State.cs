@@ -26,6 +26,10 @@ namespace Painter
 
         public Triangle InitialState { get; set; }
 
+        public int ImageWidth { get; set; }
+
+        public int ImageHeight { get; set; }
+
         // Indexers
         // Methods
         // Structs
